@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智慧农场 · 光控灯 + 土壤浇水 + LCD 显示</title>
+<style>
+  :root {
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #00979d;
+    --accent-dark: #00757a;
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #14532d 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 34px 30px;
+    margin-bottom: 24px;
+  }
+  .hero h1 { margin: 0 0 10px; font-size: 28px; font-weight: 700; letter-spacing: .2px; }
+  .hero p { margin: 0 0 16px; color: #d1d5db; font-size: 15px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge {
+    font-size: 12.5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.2);
+  }
+
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px 28px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 18px;
+  }
+  .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    flex: none;
+  }
+  h3 { font-size: 15px; margin: 20px 0 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: #f8fafc; color: #334155; font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  code.inline {
+    background: #eef2f7; color: #b42318;
+    padding: 1px 6px; border-radius: 5px; font-size: 13.5px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
+  .note {
+    background: #ecfeff;
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 14px 0 0;
+    font-size: 14px;
+    color: #155e63;
+  }
+  .warn {
+    background: #fff7ed;
+    border-left: 3px solid #f59e0b;
+    color: #9a3412;
+  }
+
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 8px;
+  }
+  .code-head span { font-size: 13px; color: var(--muted); }
+  .btn {
+    border: 0;
+    cursor: pointer;
+    font-size: 13.5px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    transition: background .15s;
+  }
+  .btn:hover { background: var(--accent-dark); }
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 18px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.6;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  pre code { font-family: inherit; }
+
+  .diagram {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #fbfdff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+  @media print {
+    body { background: #fff; }
+    .section { break-inside: avoid; border-color: #d9d9d9; }
+    .btn { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>智慧农场</h1>
+    <p>用光敏电阻自动控制照明灯，用土壤湿度传感器（AO + DO）自动控制水泵浇水，并在 LCD1602 上实时显示光照、土壤湿度与设备状态。</p>
+    <div class="badges">
+      <span class="badge">套件：SG-346 顶配豪华版（不带主板）</span>
+      <span class="badge">主控：Arduino UNO</span>
+      <span class="badge">难度：进阶</span>
+    </div>
+  </header>
+
+  <section class="section">
+    <h2 class="section-title"><span class="num">1</span>接线说明</h2>
+
+    <h3>公共电源：面包板 5V / GND 分配</h3>
+    <p>
+      这个项目需要 5V 的元件不止一个（土壤湿度、光敏、LCD、继电器、水泵共 5 路），而
+      Arduino 只有 1~2 个 5V 引脚。用面包板把 <code class="inline">5V</code> 和
+      <code class="inline">GND</code> 展开成两条“母线”，一个 5V 引脚就能分出很多个口：
+    </p>
+    <table>
+      <thead><tr><th>面包板</th><th>接电源</th><th>连接的元件（并联在这条排上）</th></tr></thead>
+      <tbody>
+        <tr><td>红色 + 排</td><td>Arduino 5V</td><td>土壤 VCC · 光敏 VCC · LCD VCC · 继电器 DC+ · 泵红线</td></tr>
+        <tr><td>蓝色/黑色 − 排</td><td>Arduino GND</td><td>土壤 GND · 光敏 GND · LCD GND · 继电器 DC- · LED 阴极 · 继电器 NO</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      面包板的红、蓝长条内部本来就是整条连通的，所以“一根 5V 线进来、很多个 5V 点出去”。
+      若水泵电流较大，建议水泵改由外接 5V 电源供电（如手机充电器），并把外接电源负极与
+      Arduino GND 共地，减轻 Arduino 的供电压力。
+    </div>
+
+    <h3>① 土壤湿度传感器（四根线全接）</h3>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色</th></tr></thead>
+      <tbody>
+        <tr><td>土壤湿度传感器</td><td>VCC</td><td>Arduino 5V</td><td>红</td></tr>
+        <tr><td>土壤湿度传感器</td><td>GND</td><td>Arduino GND</td><td>黑</td></tr>
+        <tr><td>土壤湿度传感器</td><td>AO</td><td>Arduino A0</td><td>绿</td></tr>
+        <tr><td>土壤湿度传感器</td><td>DO</td><td>Arduino D2</td><td>橙</td></tr>
+      </tbody>
+    </table>
+
+    <h3>② 光敏电阻模块（环境光）</h3>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色</th></tr></thead>
+      <tbody>
+        <tr><td>光敏电阻模块</td><td>VCC</td><td>Arduino 5V</td><td>红</td></tr>
+        <tr><td>光敏电阻模块</td><td>GND</td><td>Arduino GND</td><td>黑</td></tr>
+        <tr><td>光敏电阻模块</td><td>AO</td><td>Arduino A1</td><td>绿</td></tr>
+      </tbody>
+    </table>
+
+    <h3>③ LCD1602 显示（IC1602 转接板，I2C）</h3>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色</th></tr></thead>
+      <tbody>
+        <tr><td>LCD1602（IC1602 转接板）</td><td>VCC</td><td>Arduino 5V</td><td>红</td></tr>
+        <tr><td>LCD1602（IC1602 转接板）</td><td>GND</td><td>Arduino GND</td><td>黑</td></tr>
+        <tr><td>LCD1602（IC1602 转接板）</td><td>SDA</td><td>Arduino A4 (SDA)</td><td>紫</td></tr>
+        <tr><td>LCD1602（IC1602 转接板）</td><td>SCL</td><td>Arduino A5 (SCL)</td><td>紫</td></tr>
+      </tbody>
+    </table>
+
+    <h3>④ 照明灯（5mm LED）</h3>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色</th></tr></thead>
+      <tbody>
+        <tr><td>5mm LED 灯</td><td>阳极（长脚）经 220Ω 电阻</td><td>Arduino D7</td><td>橙</td></tr>
+        <tr><td>5mm LED 灯</td><td>阴极（短脚、平边）</td><td>Arduino GND</td><td>黑</td></tr>
+      </tbody>
+    </table>
+
+    <h3>⑤ 继电器与水泵</h3>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色</th></tr></thead>
+      <tbody>
+        <tr><td>1路继电器模块</td><td>VCC（DC+）</td><td>Arduino 5V</td><td>红</td></tr>
+        <tr><td>1路继电器模块</td><td>GND（DC-）</td><td>Arduino GND</td><td>黑</td></tr>
+        <tr><td>1路继电器模块</td><td>IN</td><td>Arduino D8</td><td>橙</td></tr>
+        <tr><td>水泵</td><td>正极（＋）</td><td>5V 电源</td><td>红</td></tr>
+        <tr><td>水泵</td><td>负极（－）</td><td>继电器 COM</td><td>—</td></tr>
+        <tr><td>继电器</td><td>NO</td><td>GND</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      板载 LED（引脚 <code class="inline">D13</code>）无需接线，土壤干燥时会自动点亮提醒。
+    </div>
+    <div class="note warn">
+      水泵是有电流的负载，请通过继电器控制，不要直接接在 Arduino 引脚上。演示时可用
+      Arduino 的 5V 给水泵短暂供电；若要长时间运行，建议用外部 5V 电源给水泵供电，
+      并把电源负极与 Arduino GND 共地。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title"><span class="num">2</span>原理</h2>
+    <p>
+      <strong>光敏电阻模块</strong>：光照越强，光敏电阻阻值越小，分压后模拟输出
+      <code class="inline">AO</code> 的电压随之变化。Arduino 用
+      <code class="inline">analogRead()</code> 读到 0–1023 的数值，低于阈值就判定为
+      “天黑”，点亮照明灯；反之关灯。
+    </p>
+    <p>
+      <strong>土壤湿度传感器</strong>：探头上的两条电极之间，土壤越湿润导电性越好，
+      模拟输出 <code class="inline">AO</code> 的值越小（干 → 数值高，湿 → 数值低）。
+      程序先读 <code class="inline">AO</code>，再按标定的
+      <code class="inline">DRY_VALUE</code> / <code class="inline">WET_VALUE</code>
+      映射成 0–100% 的湿度百分比，并给出“过干 / 适中 / 过湿”的综合判断。模块的
+      <code class="inline">DO</code> 是一个数字开关量，翻转阈值由模块上的蓝色电位器决定，
+      可直接得到“干燥 / 湿润”两种状态；两者都打印到串口，方便对照与校准。湿度低于
+      30% 时接通继电器抽水，同时板载 LED（D13）点亮提醒。
+    </p>
+    <p>
+      <strong>继电器</strong>：像一个“电磁开关”，Arduino 用小电流控制继电器线圈，继电器再
+      接通水泵的大电流回路，从而安全地控制水泵。泵的负极经过继电器的
+      <code class="inline">COM</code> 与 <code class="inline">NO</code> 触点接入回路。
+    </p>
+    <p>
+      <strong>LCD1602</strong>：通过 <code class="inline">IC1602</code> 转接板把并口屏幕变成
+      I2C 接口，只占用 <code class="inline">SDA</code>、<code class="inline">SCL</code> 两根
+      信号线，实时显示光照值、土壤湿度和“灯/泵”的开关状态。
+    </p>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title"><span class="num">3</span>运行代码</h2>
+    <p>
+      依赖库：<code class="inline">LiquidCrystal_I2C</code>（在 Arduino IDE“库管理器”中
+      搜索安装）。<code class="inline">Wire</code> 为内置库，无需安装。
+    </p>
+    <div class="code-head">
+      <span>smart_farm.ino</span>
+      <button class="btn" id="copyBtn">复制代码</button>
+    </div>
+    <pre><code id="code">#include &lt;Wire.h&gt;
+#include &lt;LiquidCrystal_I2C.h&gt;
+
+// ===== 引脚定义 =====
+#define LIGHT_SENSE_PIN  A1   // 光敏模块 AO（环境光）
+#define SOIL_SENSE_PIN   A0   // 土壤湿度 AO（模拟量）
+#define SOIL_DO_PIN      D2   // 土壤湿度 DO（数字量，阈值由蓝色电位器决定）
+#define LAMP_PIN         D7   // 照明灯（5mm LED，串 220Ω）
+#define RELAY_PIN        D8   // 继电器 IN，控制水泵
+#define DRY_LED_PIN      13   // 板载 LED D13：土壤干燥时点亮提醒
+
+// ===== 标定值：先用串口观察 ADC，再填入实际的干/湿读数 =====
+#define DRY_VALUE  800    // 完全干燥时的 ADC（干 -> 数值高）
+#define WET_VALUE  300    // 完全湿润时的 ADC（湿 -> 数值低）
+
+// ===== 阈值与判定 =====
+#define LIGHT_THRESHOLD  500  // 光照低于此值 -> 天黑开灯
+#define DRY_PCT          30   // 湿度低于 30% -> 过干，启动水泵
+#define WET_PCT          70   // 湿度高于 70% -> 过湿
+
+// ===== 方向/触发：不同模块可能相反，按串口读数改 =====
+#define DARK_IS_LOW      true  // true：光照越弱 AO 越小
+#define DO_ACTIVE_LOW    true  // true：干燥时 DO 输出低电平（常见）
+#define RELAY_ACTIVE_LOW true  // true：继电器低电平触发（多数模块）
+
+#define UPDATE_DELAY     2000UL  // 每 2 秒更新一次，想更慢就调大
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+bool lampOn = false;
+bool pumpOn = false;
+
+void setRelay(bool on) {
+  bool active = RELAY_ACTIVE_LOW ? LOW : HIGH;   // 继电器触发电平
+  digitalWrite(RELAY_PIN, on ? active : !active);
+}
+
+void lcdPad(int n) {   // 数字右对齐成 4 位
+  if (n &lt; 10)   lcd.print(' ');
+  if (n &lt; 100)  lcd.print(' ');
+  if (n &lt; 1000) lcd.print(' ');
+  lcd.print(n);
+}
+
+void lcdPct(int v) {   // 百分比右对齐成 3 位
+  if (v &lt; 10)       lcd.print("  ");
+  else if (v &lt; 100) lcd.print(' ');
+  lcd.print(v);
+}
+
+void setup() {
+  pinMode(LAMP_PIN, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(DRY_LED_PIN, OUTPUT);
+  pinMode(SOIL_DO_PIN, INPUT);
+  digitalWrite(LAMP_PIN, LOW);
+  digitalWrite(DRY_LED_PIN, LOW);
+  setRelay(false);            // 初始：灯灭、泵停、干燥灯灭
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Smart Farm v1.1");
+  lcd.setCursor(0, 1);
+  lcd.print("Starting...");
+  delay(1500);
+
+  Serial.begin(9600);
+  Serial.println("Smart Farm ready");
+}
+
+void loop() {
+  // ---- 光照 ----
+  int light = analogRead(LIGHT_SENSE_PIN);
+  bool dark = DARK_IS_LOW ? (light &lt; LIGHT_THRESHOLD)
+                          : (light &gt; LIGHT_THRESHOLD);
+  lampOn = dark;
+  digitalWrite(LAMP_PIN, lampOn ? HIGH : LOW);
+
+  // ---- 土壤湿度 ----
+  int soil = analogRead(SOIL_SENSE_PIN);
+  int doLevel = digitalRead(SOIL_DO_PIN);
+  float voltage = soil * 5.0 / 1023.0;
+  int moisture = constrain(map(soil, DRY_VALUE, WET_VALUE, 0, 100), 0, 100);
+  bool doDry = DO_ACTIVE_LOW ? (doLevel == LOW) : (doLevel == HIGH);
+  const char* doStatus = doDry ? "干燥" : "湿润";
+  const char* status = moisture &lt; DRY_PCT ? "过干"
+                     : moisture &gt; WET_PCT ? "过湿" : "适中";
+
+  bool dry = (moisture &lt; DRY_PCT);
+  pumpOn = dry;
+  setRelay(pumpOn);
+  digitalWrite(DRY_LED_PIN, dry ? HIGH : LOW);
+
+  // ---- LCD 显示 ----
+  lcd.setCursor(0, 0);
+  lcd.print("L:"); lcdPad(light);
+  lcd.print(" Lamp:"); lcd.print(lampOn ? "ON  " : "OFF ");
+
+  lcd.setCursor(0, 1);
+  lcd.print("S:"); lcdPct(moisture); lcd.print("%");
+  lcd.print(" Pump:"); lcd.print(pumpOn ? "ON  " : "OFF ");
+
+  // ---- 串口：打印土壤 6 项 + 光照 ----
+  Serial.println("===== 土壤湿度 =====");
+  Serial.print("1. ADC 原始值 : "); Serial.println(soil);
+  Serial.print("2. 输出电压  : "); Serial.print(voltage, 2); Serial.println(" V");
+  Serial.print("3. 土壤湿度  : "); Serial.print(moisture); Serial.println(" %");
+  Serial.print("4. DO 电平   : "); Serial.println(doLevel);
+  Serial.print("5. DO 状态   : "); Serial.println(doStatus);
+  Serial.print("6. 综合状态  : "); Serial.println(status);
+  Serial.print("光照 ADC="); Serial.print(light);
+  Serial.print(" 灯="); Serial.print(lampOn ? "开" : "关");
+  Serial.print(" 泵="); Serial.println(pumpOn ? "开" : "关");
+  Serial.println("------------------------");
+
+  delay(UPDATE_DELAY);
+}</code></pre>
+    <div class="note">
+      <strong>第一次使用先标定：</strong>上传后打开串口监视器（波特率
+      <code class="inline">9600</code>），把土壤探头分别插入完全干燥的土和浇透水的土，记下
+      两端的 ADC 值，填进 <code class="inline">DRY_VALUE</code>（干）和
+      <code class="inline">WET_VALUE</code>（湿）。若 DO 的“干燥/湿润”判断反了，把
+      <code class="inline">DO_ACTIVE_LOW</code> 取反；继电器或灯光方向反了，分别改
+      <code class="inline">RELAY_ACTIVE_LOW</code> / <code class="inline">DARK_IS_LOW</code>。
+      若屏幕无任何显示，把代码里 <code class="inline">lcd(0x27, 16, 2)</code> 的地址改成
+      <code class="inline">0x3F</code> 再试（这是 LCD1602 I2C 常见的两种地址）。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title"><span class="num">4</span>电路连接图</h2>
+    <svg class="diagram" viewBox="0 0 960 910" role="img"
+         aria-label="智慧农场电路连接图">
+      <!-- Arduino UNO -->
+      <rect x="20" y="40" width="190" height="790" rx="10"
+            fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+      <rect x="20" y="40" width="190" height="42" rx="10" fill="#0f172a"/>
+      <text x="115" y="68" text-anchor="middle" fill="#fff"
+            font-size="16" font-weight="600">Arduino UNO</text>
+      <g font-size="13" fill="#334155" text-anchor="end">
+        <text x="186" y="104">5V</text>
+        <text x="186" y="130">GND</text>
+        <text x="186" y="212">A0</text>
+        <text x="186" y="248">D2</text>
+        <text x="186" y="372">A1</text>
+        <text x="186" y="502">D7</text>
+        <text x="186" y="622">D8</text>
+        <text x="186" y="772">A4 (SDA)</text>
+        <text x="186" y="808">A5 (SCL)</text>
+        <text x="186" y="830" font-size="11" fill="#94a3b8">D13（板载LED·干燥指示）</text>
+      </g>
+
+      <!-- 土壤湿度 -->
+      <rect x="470" y="160" width="250" height="130" rx="8"
+            fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="470" y="160" width="250" height="32" rx="8" fill="#334155"/>
+      <text x="595" y="181" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">土壤湿度传感器</text>
+      <text x="482" y="212" font-size="13" fill="#334155">AO 湿度</text>
+      <text x="482" y="248" font-size="13" fill="#334155">DO 阈值</text>
+      <text x="708" y="204" text-anchor="end" font-size="13" fill="#334155">VCC</text>
+      <text x="708" y="274" text-anchor="end" font-size="13" fill="#334155">GND</text>
+
+      <!-- 光敏模块 -->
+      <rect x="470" y="320" width="250" height="110" rx="8"
+            fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="470" y="320" width="250" height="32" rx="8" fill="#334155"/>
+      <text x="595" y="341" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">光敏模块</text>
+      <text x="482" y="372" font-size="13" fill="#334155">AO 光强</text>
+      <text x="708" y="364" text-anchor="end" font-size="13" fill="#334155">VCC</text>
+      <text x="708" y="404" text-anchor="end" font-size="13" fill="#334155">GND</text>
+
+      <!-- 照明灯 -->
+      <rect x="470" y="450" width="250" height="100" rx="8"
+            fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="470" y="450" width="250" height="32" rx="8" fill="#334155"/>
+      <text x="595" y="471" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">照明灯（LED + 220Ω）</text>
+      <text x="482" y="502" font-size="13" fill="#334155">阳极（经电阻）</text>
+      <text x="708" y="534" text-anchor="end" font-size="13" fill="#334155">阴极</text>
+
+      <!-- 继电器 + 水泵 -->
+      <rect x="470" y="570" width="250" height="130" rx="8"
+            fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="470" y="570" width="250" height="32" rx="8" fill="#334155"/>
+      <text x="595" y="591" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">1路继电器 + 水泵</text>
+      <text x="482" y="622" font-size="13" fill="#334155">IN</text>
+      <text x="708" y="614" text-anchor="end" font-size="13" fill="#334155">VCC</text>
+      <text x="708" y="674" text-anchor="end" font-size="13" fill="#334155">GND</text>
+      <text x="595" y="652" text-anchor="middle" font-size="11" fill="#64748b">
+        泵(+)→5V，泵(−)→COM，NO→GND
+      </text>
+
+      <!-- LCD1602 -->
+      <rect x="470" y="720" width="250" height="160" rx="8"
+            fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="470" y="720" width="250" height="32" rx="8" fill="#334155"/>
+      <text x="595" y="741" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">LCD1602（I2C）</text>
+      <text x="482" y="772" font-size="13" fill="#334155">SDA</text>
+      <text x="482" y="808" font-size="13" fill="#334155">SCL</text>
+      <text x="708" y="764" text-anchor="end" font-size="13" fill="#334155">VCC</text>
+      <text x="708" y="854" text-anchor="end" font-size="13" fill="#334155">GND</text>
+
+      <!-- 电源干线 -->
+      <line x1="900" y1="100" x2="900" y2="880" stroke="#e11d48" stroke-width="2"/>
+      <line x1="940" y1="126" x2="940" y2="880" stroke="#334155" stroke-width="2"/>
+      <path d="M 210 100 H 900" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 126 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- 信号线 -->
+      <path d="M 210 208 H 470" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 244 H 470" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 368 H 470" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 498 H 470" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 618 H 470" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 768 H 470" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 210 804 H 470" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- 电源线 -->
+      <path d="M 720 200 H 900" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 270 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 360 H 900" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 400 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 530 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 610 H 900" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 670 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 760 H 900" fill="none" stroke="#e11d48" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 720 850 H 940" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- 线标签 -->
+      <g font-size="12" fill="#475569">
+        <text x="300" y="202">A0</text>
+        <text x="300" y="238">D2</text>
+        <text x="300" y="362">A1</text>
+        <text x="300" y="492">D7</text>
+        <text x="300" y="612">D8</text>
+        <text x="300" y="762">SDA</text>
+        <text x="300" y="798">SCL</text>
+      </g>
+
+      <!-- 连接点 -->
+      <g fill="#0f172a">
+        <circle cx="210" cy="100" r="4"/><circle cx="210" cy="126" r="4"/>
+        <circle cx="210" cy="208" r="4"/><circle cx="210" cy="244" r="4"/>
+        <circle cx="210" cy="368" r="4"/><circle cx="210" cy="498" r="4"/>
+        <circle cx="210" cy="618" r="4"/><circle cx="210" cy="768" r="4"/>
+        <circle cx="210" cy="804" r="4"/>
+        <circle cx="470" cy="208" r="4"/><circle cx="470" cy="244" r="4"/>
+        <circle cx="470" cy="368" r="4"/><circle cx="470" cy="498" r="4"/>
+        <circle cx="470" cy="618" r="4"/><circle cx="470" cy="768" r="4"/>
+        <circle cx="470" cy="804" r="4"/>
+        <circle cx="720" cy="200" r="4"/><circle cx="720" cy="270" r="4"/>
+        <circle cx="720" cy="360" r="4"/><circle cx="720" cy="400" r="4"/>
+        <circle cx="720" cy="530" r="4"/><circle cx="720" cy="610" r="4"/>
+        <circle cx="720" cy="670" r="4"/><circle cx="720" cy="760" r="4"/>
+        <circle cx="720" cy="850" r="4"/>
+      </g>
+
+      <!-- 图例 -->
+      <g font-size="12" fill="#475569">
+        <line x1="24" y1="892" x2="56" y2="892" stroke="#e11d48" stroke-width="2"/>
+        <text x="62" y="896">5V / VCC</text>
+        <line x1="150" y1="892" x2="182" y2="892" stroke="#334155" stroke-width="2"/>
+        <text x="188" y="896">GND</text>
+        <line x1="248" y1="892" x2="280" y2="892" stroke="#f59e0b" stroke-width="2"/>
+        <text x="286" y="896">数字信号</text>
+        <line x1="380" y1="892" x2="412" y2="892" stroke="#16a34a" stroke-width="2"/>
+        <text x="418" y="896">模拟信号</text>
+        <line x1="500" y1="892" x2="532" y2="892" stroke="#7c3aed" stroke-width="2"/>
+        <text x="538" y="896">I2C</text>
+      </g>
+    </svg>
+  </section>
+
+  <footer>由 arduino-solution 生成 · 仅供学习与快速接线参考</footer>
+</div>
+
+<script>
+  const btn = document.getElementById('copyBtn');
+  const code = document.getElementById('code');
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(code.innerText);
+      btn.textContent = '已复制 ✓';
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = code.innerText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      btn.textContent = '已复制 ✓';
+    }
+    setTimeout(() => { btn.textContent = '复制代码'; }, 1800);
+  });
+</script>
+</body>
+</html>

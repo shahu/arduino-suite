@@ -1,0 +1,26 @@
+# ===== Arduino 构建产物 =====
+build/
+*.o
+*.a
+*.elf
+*.hex
+*.eeprom
+*.map
+*.so
+.arduino/
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.kdev4
+
+# ===== 系统杂项 =====
+Thumbs.db
+.DS_Store
+desktop.ini
+*.log
+*.tmp
+
+# ===== 临时/备份 =====
+*~
+*.bak

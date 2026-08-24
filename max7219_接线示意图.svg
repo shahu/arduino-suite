@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 710" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif">
+  <defs>
+    <pattern id="grid" width="8.5" height="8.5" patternUnits="userSpaceOnUse">
+      <path d="M 8.5 0 L 0 0 0 8.5" fill="none" stroke="#2A2A2A" stroke-width="0.8"/>
+    </pattern>
+  </defs>
+
+  <!-- ===================== 标题 ===================== -->
+  <text x="590" y="36" font-size="22" font-weight="bold" fill="#1A1A1A" text-anchor="middle">MAX7219 4合1点阵模块 + LM35D 与 Arduino UNO 接线示意图</text>
+  <text x="590" y="58" font-size="13" fill="#666666" text-anchor="middle">颜色：红=5V　黑/灰=GND　绿=DIN(D11)　橙=CS(D10)　蓝=CLK(D13)　紫=VOUT→A0</text>
+
+  <!-- ===================== Arduino UNO ===================== -->
+  <rect x="70" y="150" width="290" height="330" rx="16" fill="#00878F" stroke="#005E64" stroke-width="2.5"/>
+  <rect x="82" y="175" width="14" height="285" rx="3" fill="#0B6A70"/>
+  <rect x="336" y="175" width="14" height="285" rx="3" fill="#0B6A70"/>
+  <text x="215" y="168" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Arduino UNO</text>
+  <text x="215" y="500" font-size="10" fill="#666666" text-anchor="middle">（引脚位置为简化示意：实物 D10–D13 在左侧排针、5V/GND 在右侧排针）</text>
+
+  <!-- ===================== LM35D ===================== -->
+  <text x="570" y="88" font-size="9" fill="#888888" text-anchor="middle">LM35D 平面朝自己：左 VCC　中 VOUT　右 GND</text>
+  <rect x="520" y="95" width="100" height="80" rx="10" fill="#F4F4F4" stroke="#333333" stroke-width="2"/>
+  <text x="570" y="135" font-size="16" font-weight="bold" fill="#222222" text-anchor="middle">LM35D</text>
+  <text x="570" y="152" font-size="9" fill="#888888" text-anchor="middle">TO-92</text>
+  <line x1="545" y1="175" x2="545" y2="195" stroke="#555555" stroke-width="2.5"/>
+  <line x1="575" y1="175" x2="575" y2="195" stroke="#555555" stroke-width="2.5"/>
+  <line x1="605" y1="175" x2="605" y2="195" stroke="#555555" stroke-width="2.5"/>
+  <text x="545" y="213" font-size="11" fill="#333333" text-anchor="middle">VCC</text>
+  <text x="575" y="213" font-size="11" fill="#333333" text-anchor="middle">VOUT</text>
+  <text x="605" y="213" font-size="11" fill="#333333" text-anchor="middle">GND</text>
+  <text x="575" y="226" font-size="10" fill="#8E24AA" text-anchor="middle">→ A0</text>
+
+  <!-- ===================== MAX7219 模块 ===================== -->
+  <rect x="760" y="170" width="330" height="290" rx="12" fill="#16324F" stroke="#0D2238" stroke-width="2.5"/>
+  <text x="925" y="193" font-size="15" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MAX7219 4合1点阵模块</text>
+  <text x="925" y="210" font-size="10" fill="#9FC3E8" text-anchor="middle">8×8 × 4 级联</text>
+  <rect x="750" y="200" width="10" height="140" rx="2" fill="#0D2238"/>
+  <!-- 4 块 8x8 点阵 -->
+  <rect x="790" y="290" width="68" height="68" fill="#050505" stroke="#4A5A6A" stroke-width="1.5"/>
+  <rect x="790" y="290" width="68" height="68" fill="url(#grid)"/>
+  <rect x="868" y="290" width="68" height="68" fill="#050505" stroke="#4A5A6A" stroke-width="1.5"/>
+  <rect x="868" y="290" width="68" height="68" fill="url(#grid)"/>
+  <rect x="946" y="290" width="68" height="68" fill="#050505" stroke="#4A5A6A" stroke-width="1.5"/>
+  <rect x="946" y="290" width="68" height="68" fill="url(#grid)"/>
+  <rect x="1024" y="290" width="68" height="68" fill="#050505" stroke="#4A5A6A" stroke-width="1.5"/>
+  <rect x="1024" y="290" width="68" height="68" fill="url(#grid)"/>
+  <!-- 点亮点（示意图案 1 2 3 4） -->
+  <g fill="#FFB300">
+    <circle cx="828.25" cy="302.75" r="2.8"/><circle cx="828.25" cy="311.25" r="2.8"/><circle cx="828.25" cy="319.75" r="2.8"/><circle cx="828.25" cy="328.25" r="2.8"/><circle cx="828.25" cy="336.75" r="2.8"/><circle cx="794.25" cy="294.25" r="2.8"/>
+    <circle cx="880.75" cy="294.25" r="2.8"/><circle cx="889.25" cy="294.25" r="2.8"/><circle cx="897.75" cy="294.25" r="2.8"/><circle cx="897.75" cy="311.25" r="2.8"/><circle cx="872.25" cy="319.75" r="2.8"/><circle cx="880.75" cy="319.75" r="2.8"/><circle cx="889.25" cy="319.75" r="2.8"/><circle cx="897.75" cy="319.75" r="2.8"/><circle cx="872.25" cy="336.75" r="2.8"/><circle cx="872.25" cy="345.25" r="2.8"/><circle cx="880.75" cy="345.25" r="2.8"/><circle cx="889.25" cy="345.25" r="2.8"/><circle cx="897.75" cy="345.25" r="2.8"/>
+    <circle cx="950.25" cy="294.25" r="2.8"/><circle cx="958.75" cy="294.25" r="2.8"/><circle cx="967.25" cy="294.25" r="2.8"/><circle cx="975.75" cy="294.25" r="2.8"/><circle cx="975.75" cy="311.25" r="2.8"/><circle cx="950.25" cy="319.75" r="2.8"/><circle cx="958.75" cy="319.75" r="2.8"/><circle cx="967.25" cy="319.75" r="2.8"/><circle cx="975.75" cy="319.75" r="2.8"/><circle cx="975.75" cy="336.75" r="2.8"/><circle cx="950.25" cy="345.25" r="2.8"/><circle cx="958.75" cy="345.25" r="2.8"/><circle cx="967.25" cy="345.25" r="2.8"/><circle cx="975.75" cy="345.25" r="2.8"/>
+    <circle cx="1036.75" cy="294.25" r="2.8"/><circle cx="1045.25" cy="294.25" r="2.8"/><circle cx="1036.75" cy="302.75" r="2.8"/><circle cx="1045.25" cy="302.75" r="2.8"/><circle cx="1053.75" cy="311.25" r="2.8"/><circle cx="1036.75" cy="319.75" r="2.8"/><circle cx="1045.25" cy="319.75" r="2.8"/><circle cx="1053.75" cy="319.75" r="2.8"/><circle cx="1053.75" cy="328.25" r="2.8"/><circle cx="1053.75" cy="336.75" r="2.8"/><circle cx="1053.75" cy="345.25" r="2.8"/>
+  </g>
+  <!-- MAX7219 芯片 -->
+  <rect x="1000" y="225" width="66" height="44" rx="4" fill="#1A1A1A" stroke="#8A94A6" stroke-width="1.5"/>
+  <text x="1033" y="247" font-size="10" fill="#D8E2F0" text-anchor="middle">MAX7219</text>
+  <text x="1033" y="260" font-size="8" fill="#8A94A6" text-anchor="middle">驱动IC</text>
+  <text x="925" y="478" font-size="10" fill="#7FA8CC" text-anchor="middle">（引脚顺序以你模块上的丝印为准，此图为示意布局）</text>
+
+  <!-- ===================== 导线 ===================== -->
+  <g fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 5V 主线：Arduino 5V → 模块 VCC（绕开 LM35D 下方） -->
+    <path d="M 360,185 H 700 V 210 H 760" stroke="#E53935"/>
+    <!-- GND 主线：Arduino GND → 模块 GND -->
+    <path d="M 360,225 H 720 V 240 H 760" stroke="#616161"/>
+    <!-- 5V 分支 → LM35D VCC -->
+    <path d="M 470,185 V 195 H 545" stroke="#E53935"/>
+    <!-- GND 分支 → LM35D GND -->
+    <path d="M 605,225 V 195" stroke="#616161"/>
+    <!-- DIN：D11 → 模块 DIN -->
+    <path d="M 360,375 H 700 V 270 H 760" stroke="#43A047"/>
+    <!-- CS：D10 → 模块 CS -->
+    <path d="M 360,415 H 700 V 300 H 760" stroke="#FB8C00"/>
+    <!-- CLK：D13 → 模块 CLK -->
+    <path d="M 360,455 H 700 V 330 H 760" stroke="#1E88E5"/>
+    <!-- A0：LM35D VOUT → A0（跨过 GND 线处画跳线弧） -->
+    <path d="M 575,195 V 220 Q 586,220 586,225 Q 586,230 575,230 V 280 H 360 V 265" stroke="#8E24AA"/>
+  </g>
+
+  <!-- ===================== 引脚圆点（画在导线上层） ===================== -->
+  <g stroke="#003B3E" stroke-width="1.2">
+    <circle cx="360" cy="185" r="5.5" fill="#E53935"/>
+    <circle cx="360" cy="225" r="5.5" fill="#616161"/>
+    <circle cx="360" cy="265" r="5.5" fill="#8E24AA"/>
+    <circle cx="360" cy="375" r="5.5" fill="#43A047"/>
+    <circle cx="360" cy="415" r="5.5" fill="#FB8C00"/>
+    <circle cx="360" cy="455" r="5.5" fill="#1E88E5"/>
+  </g>
+  <g stroke="#333333" stroke-width="1">
+    <circle cx="760" cy="210" r="5" fill="#E53935"/>
+    <circle cx="760" cy="240" r="5" fill="#616161"/>
+    <circle cx="760" cy="270" r="5" fill="#43A047"/>
+    <circle cx="760" cy="300" r="5" fill="#FB8C00"/>
+    <circle cx="760" cy="330" r="5" fill="#1E88E5"/>
+    <circle cx="545" cy="195" r="4.5" fill="#999999"/>
+    <circle cx="575" cy="195" r="4.5" fill="#999999"/>
+    <circle cx="605" cy="195" r="4.5" fill="#999999"/>
+  </g>
+
+  <!-- ===================== 引脚标签 ===================== -->
+  <g font-size="12" font-weight="bold" fill="#FFFFFF" text-anchor="end">
+    <text x="334" y="190">5V</text>
+    <text x="334" y="230">GND</text>
+    <text x="334" y="270">A0</text>
+    <text x="334" y="380">D11</text>
+    <text x="334" y="420">D10</text>
+    <text x="334" y="460">D13</text>
+  </g>
+  <g font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="start">
+    <text x="778" y="215">VCC</text>
+    <text x="778" y="245">GND</text>
+    <text x="778" y="275">DIN</text>
+    <text x="778" y="305">CS</text>
+    <text x="778" y="335">CLK</text>
+  </g>
+
+  <!-- ===================== 线上标签 ===================== -->
+  <g font-size="10.5" font-weight="bold">
+    <text x="480" y="178" fill="#E53935">5V</text>
+    <text x="480" y="218" fill="#616161">GND</text>
+    <text x="400" y="275" fill="#8E24AA">A0</text>
+    <text x="400" y="368" fill="#43A047">DIN</text>
+    <text x="400" y="408" fill="#FB8C00">CS</text>
+    <text x="400" y="448" fill="#1E88E5">CLK</text>
+  </g>
+
+  <!-- ===================== 图例与要点 ===================== -->
+  <rect x="70" y="540" width="1040" height="150" rx="10" fill="#F7F9FB" stroke="#DDE3EA" stroke-width="1.5"/>
+  <text x="90" y="562" font-size="13" font-weight="bold" fill="#333333">图例 / 接线要点</text>
+  <g font-size="12" fill="#333333">
+    <line x1="95" y1="588" x2="135" y2="588" stroke="#E53935" stroke-width="3"/>
+    <text x="145" y="592">5V（红）</text>
+    <line x1="245" y1="588" x2="285" y2="588" stroke="#616161" stroke-width="3"/>
+    <text x="295" y="592">GND（黑/灰）</text>
+    <line x1="410" y1="588" x2="450" y2="588" stroke="#43A047" stroke-width="3"/>
+    <text x="460" y="592">DIN → D11</text>
+    <line x1="545" y1="588" x2="585" y2="588" stroke="#FB8C00" stroke-width="3"/>
+    <text x="595" y="592">CS → D10</text>
+    <line x1="675" y1="588" x2="715" y2="588" stroke="#1E88E5" stroke-width="3"/>
+    <text x="725" y="592">CLK → D13</text>
+    <line x1="815" y1="588" x2="855" y2="588" stroke="#8E24AA" stroke-width="3"/>
+    <text x="865" y="592">VOUT → A0</text>
+  </g>
+  <g font-size="12" fill="#444444">
+    <text x="90" y="618">① 模块必须 5V 供电；点阵电流较大，若变暗/闪烁，在模块 VCC–GND 间并一个 100µF 电容（多数模块已自带），或改用外部 5V 电源。</text>
+    <text x="90" y="640">② D13/D11/D10 恰好是 SPI 的 SCK/MOSI/SS；LedControl 库是软件时序，改接其它数字脚也可以（记得同步改代码）。</text>
+    <text x="90" y="662">③ 代码：先 #include &lt;LedControl.h&gt;，再 LedControl lc(11, 13, 10, 4); —— 即 (DIN, CLK, CS, 级联设备数)。</text>
+    <text x="90" y="684">④ 若暂不接 LM35D，忽略紫色线即可，其余不变；LM35D 换算：tempC = analogRead(A0) * 5.0 / 1023.0 * 100.0。</text>
+  </g>
+</svg>
