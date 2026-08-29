@@ -36,6 +36,17 @@
 //   DO  ──► 空（不接；仅串联多块灯板时才接下一块的 DI）
 //   ⚠ 16 颗全亮电流大：建议给 5V 单独供电（负极共地），或降低亮度
 //
+// 【超声波测距模块（HC-SR04）】
+//   VCC ──► 5V
+//   GND ──► GND
+//   TRIG ──► D11      // 控制端
+//   ECHO ──► D10      // 接收端
+//
+// 【无源蜂鸣器模块（3 针：VCC/GND/I/O）】
+//   VCC ──► 5V
+//   GND ──► GND
+//   I/O ──► D9      // 信号端，用 tone() 改变频率奏乐
+//
 // 【I2C LCD（0x27）】
 //   VCC ──► 5V
 //   GND ──► GND
@@ -54,9 +65,12 @@
 #define SOIL_DO_PIN      2    // 土壤湿度 DO（数字量，阈值由蓝色电位器决定）
 #define NEOPIXEL_PIN     6    // WS2812 灯环 DI（数据输入）
 #define NUM_LEDS         16   // 灯板 LED 数量（16 位）
-#define LAMP_BRIGHTNESS  100  // 亮度 0-255，16 颗较费电，过高会拉垮 5V
+#define LAMP_BRIGHTNESS  60   // 亮度 0-255，16 颗较费电，过高会拉垮 5V
 #define RELAY_PIN        8    // 继电器 IN，控制水泵
 #define DRY_LED_PIN      13   // 板载 LED（Uno/Nano 为 D13）：土壤干燥时点亮提醒
+#define TRIG_PIN         11   // 超声波 HC-SR04 TRIG（控制端）
+#define ECHO_PIN         10   // 超声波 HC-SR04 ECHO（接收端）
+#define BUZZER_PIN       9    // 无源蜂鸣器（奏乐）
 
 // ===== 标定值：先用串口观察 ADC，再填入实际的干/湿读数 =====
 #define DRY_VALUE  800    // 完全干燥时的 ADC（干 -> 数值高）
@@ -78,24 +92,32 @@
 #define UPDATE_DELAY     2000UL  // 土壤/泵/LCD/串口刷新间隔
 #define LIGHT_CHECK_MS   250UL   // 光照/灯刷新间隔（越小响应越快）
 #define DEBOUNCE_MS      400UL   // 光照判定需稳定多少毫秒才切换（防抖）
+#define DIST_THRESHOLD_CM    30    // 小于此距离(cm)视为有人靠近
+#define ULTRASOUND_CHECK_MS  300   // 测距间隔(ms)
+#define RADAR_COOLDOWN_MS    3000  // 两次触发乐曲的最小间隔(ms)
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Adafruit_NeoPixel strip(NUM_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 bool lampOn = false;
 bool pumpOn = false;
-int screen = 0;   // LCD 轮替屏号：0=欢迎 1=土壤 2=泵 3=光照
+int screen = 0;   // LCD 轮替屏号：0=欢迎 1=土壤 2=泵 3=光照 4=距离
+float lastDist = -1;   // 最近一次测得的距离(cm)，-1=无回波
 
 void setRelay(bool on) {
   bool active = RELAY_ACTIVE_LOW ? LOW : HIGH;   // 继电器触发电平
   digitalWrite(RELAY_PIN, on ? active : !active);
 }
 
-// 点亮/熄灭 WS2812 灯板（on=亮白光, off=灭）
+// 点亮/熄灭 WS2812 灯板（on=间隔点亮 8 颗白光, off=灭）
 void setLamp(bool on) {
   if (on) {
-    for (int i = 0; i < NUM_LEDS; i++)
-      strip.setPixelColor(i, strip.Color(255, 255, 255));  // 白光，可改 RGB
+    for (int i = 0; i < NUM_LEDS; i++) {
+      if (i % 2 == 0)   // 间隔点亮：每 2 颗点 1 颗（0,2,4...共 8 颗），省电流
+        strip.setPixelColor(i, strip.Color(255, 255, 255));  // 白光，可改 RGB
+      else
+        strip.setPixelColor(i, 0);
+    }
   } else {
     for (int i = 0; i < NUM_LEDS; i++)
       strip.setPixelColor(i, 0);   // 全灭
@@ -110,6 +132,60 @@ uint32_t wheel(byte pos) {
   if (pos < 170) { pos -= 85; return strip.Color(0, pos * 3, 255 - pos * 3); }
   pos -= 170;
   return strip.Color(pos * 3, 255 - pos * 3, 0);
+}
+
+// ===== 接近检测：乐曲《生日快乐歌》（非阻塞播放）=====
+// 频率(Hz)，每行对应一句
+const int melodyFreq[] = {
+  392,392,440,392,523,494,            // 祝你生日快乐 (Happy birthday to you)
+  392,392,440,392,587,523,            // 祝你生日快乐
+  392,392,784,659,523,494,440,        // 祝你生日快乐 [名字]
+  698,698,659,523,587,523             // 祝你生日快乐
+};
+// 时值(ms)：附点八分+十六分 / 四分 / 四分 / 四分 / 二分
+const int melodyDur[] = {
+  375,125,500,500,500,1000,
+  375,125,500,500,500,1000,
+  375,125,500,500,500,500,1000,
+  375,125,500,500,500,1000
+};
+const int MELODY_LEN = 25;
+int noteIdx = 0;
+unsigned long noteStart = 0;
+bool playing = false;
+
+void startSong() {
+  noteIdx = 0;
+  noteStart = millis();
+  playing = true;
+  tone(BUZZER_PIN, melodyFreq[0]);
+}
+
+// 每圈调用，按拍长自动推进音符；播完停止（不阻塞其他逻辑）
+void updateSong() {
+  if (!playing) return;
+  if (millis() - noteStart >= melodyDur[noteIdx]) {
+    noteStart = millis();
+    noteIdx++;
+    if (noteIdx >= MELODY_LEN) {
+      noTone(BUZZER_PIN);
+      playing = false;
+    } else {
+      tone(BUZZER_PIN, melodyFreq[noteIdx]);
+    }
+  }
+}
+
+// HC-SR04 测距（返回 cm；-1 = 超时无回波）
+float readDistance() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  unsigned long dur = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (dur == 0) return -1;
+  return dur / 58.0;   // 厘米
 }
 
 void lcdPad(int n) {   // 数字右对齐成 4 位
@@ -130,6 +206,10 @@ void setup() {
   pinMode(DRY_LED_PIN, OUTPUT);
   pinMode(SOIL_DO_PIN, INPUT);
   pinMode(LIGHT_DO_PIN, INPUT);
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(TRIG_PIN, LOW);   // 模块要求先拉低 TRIG
   strip.begin();
   strip.setBrightness(LAMP_BRIGHTNESS);
   strip.clear();
@@ -174,6 +254,21 @@ void loop() {
   static unsigned long lastLightCheck = 0;
   static unsigned long lastSoilUpdate = 0;
   unsigned long ms = millis();
+
+  // ---- 超声波测距 & 接近报警：每 ULTRASOUND_CHECK_MS 测一次 ----
+  static unsigned long lastUltraCheck = 0;
+  static unsigned long lastTrigger = 0;
+  if (ms - lastUltraCheck >= ULTRASOUND_CHECK_MS) {
+    lastUltraCheck = ms;
+    float dist = readDistance();
+    lastDist = dist;
+    if (dist > 0 && dist < DIST_THRESHOLD_CM && (ms - lastTrigger > RADAR_COOLDOWN_MS)) {
+      lastTrigger = ms;
+      startSong();
+      Serial.print("有人靠近! 距离="); Serial.print(dist); Serial.println(" cm");
+    }
+  }
+  updateSong();   // 让乐曲逐音符推进（非阻塞，不卡灯/水泵）
 
   // ---- 光照 & 灯：每 LIGHT_CHECK_MS 判断一次，快速响应手遮挡 ----
   if (ms - lastLightCheck >= LIGHT_CHECK_MS) {
@@ -233,24 +328,45 @@ void loop() {
         lcd.print(dark ? "   DARK" : "  BRIGHT");
         lcd.print("        ");
         break;
+      case 4:   // 屏 5：距离(cm)
+        lcd.setCursor(0, 0); lcd.print("Distance        ");
+        lcd.setCursor(0, 1);
+        if (lastDist >= 0) {
+          lcd.print("   "); lcd.print((int)lastDist); lcd.print(" cm");
+        } else {
+          lcd.print("   -- cm");
+        }
+        lcd.print("       ");
+        break;
     }
 
-    // ---- 串口：打印土壤 6 项 + 光照 ----
-    Serial.print(">>> LCD Screen #"); Serial.println(screen);
-    Serial.println("===== 土壤湿度 =====");
-    Serial.print("1. ADC 原始值 : "); Serial.println(soil);
-    Serial.print("2. 输出电压  : "); Serial.print(voltage, 2); Serial.println(" V");
-    Serial.print("3. 土壤湿度  : "); Serial.print(moisture); Serial.println(" %");
-    Serial.print("4. DO 电平   : "); Serial.println(doLevel);
-    Serial.print("5. DO 状态   : "); Serial.println(doStatus);
-    Serial.print("6. 综合状态  : "); Serial.println(status);
-    Serial.print("光敏DO="); Serial.print(lightLevel);
-    Serial.print(" 判定dark="); Serial.print(dark ? 1 : 0);
-    Serial.print(" 灯="); Serial.print(lampOn ? "开" : "关");
-    Serial.print(" 泵="); Serial.print(pumpOn ? "开" : "关");
-    Serial.print(" (D8电平="); Serial.print(digitalRead(RELAY_PIN)); Serial.println(")");
-    Serial.println("------------------------");
+    // ---- 串口：一次性打印全部传感器状态（每 2 秒）----
+    Serial.println("==============================================");
+    Serial.print("[Smart Farm]  LCD屏#"); Serial.println(screen);
 
-    screen = (screen + 1) % 4;   // 下一屏（下个周期显示）
+    Serial.println("-- 光敏传感器 (LDR, DO--D3) ---");
+    Serial.print("   DO电平   : "); Serial.println(lightLevel);
+    Serial.print("   判定     : "); Serial.println(dark ? "黑暗 DARK" : "明亮 BRIGHT");
+    Serial.print("   照明灯   : "); Serial.println(lampOn ? "ON" : "OFF");
+
+    Serial.println("-- 土壤湿度传感器 (AO--A0, DO--D2) ---");
+    Serial.print("   ADC原始值 : "); Serial.println(soil);
+    Serial.print("   输出电压  : "); Serial.print(voltage, 2); Serial.println(" V");
+    Serial.print("   土壤湿度  : "); Serial.print(moisture); Serial.println(" %");
+    Serial.print("   DO电平   : "); Serial.println(doLevel);
+    Serial.print("   DO状态   : "); Serial.println(doStatus);
+    Serial.print("   综合状态  : "); Serial.println(status);
+
+    Serial.println("-- 超声波测距 (HC-SR04, TRIG--D11, ECHO--D10) ---");
+    if (lastDist >= 0) { Serial.print("   距离      : "); Serial.print(lastDist); Serial.println(" cm"); }
+    else               { Serial.println("   距离      : -- cm (无回波)"); }
+
+    Serial.println("-- 水泵 / 继电器 (D8) ---");
+    Serial.print("   泵状态    : "); Serial.println(pumpOn ? "ON 抽水" : "OFF 停止");
+    Serial.print("   继电器电平: "); Serial.println(digitalRead(RELAY_PIN));
+
+    Serial.println("==============================================");
+
+    screen = (screen + 1) % 5;   // 下一屏（下个周期显示）
   }
 }
