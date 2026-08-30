@@ -247,6 +247,29 @@
       Arduino 的 5V 给水泵短暂供电；若要长时间运行，建议用外部 5V 电源给水泵供电，
       并把电源负极与 Arduino GND 共地。
     </div>
+
+    <h3>⑥ NodeMCU (ESP8266) —— WiFi 网络模块（新增）</h3>
+    <p>
+      NodeMCU 负责开 <strong>WiFi 热点 + 网页服务器</strong>，与 Arduino 通过
+      <strong>串口(UART)</strong>通信。Arduino 每 2 秒把传感器数据发给 NodeMCU，
+      网页上的亮度滑块再由 NodeMCU 发命令给 Arduino 调整灯亮度。
+    </p>
+    <table>
+      <thead><tr><th>元件</th><th>元件引脚</th><th>连接到</th><th>线色/说明</th></tr></thead>
+      <tbody>
+        <tr><td>NodeMCU 扩展板</td><td>GND</td><td>Arduino GND</td><td>黑（共地，必须）</td></tr>
+        <tr><td>NodeMCU 扩展板</td><td>TX</td><td>Arduino 引脚 4 (RX)</td><td>3.3V→5V，直连即可</td></tr>
+        <tr><td>NodeMCU 扩展板</td><td>RX</td><td>经 1kΩ/2kΩ 分压 → Arduino 引脚 12 (TX)</td><td>5V→3.3V，必须降压</td></tr>
+        <tr><td>NodeMCU 扩展板</td><td>5V</td><td>底座 6~24V 电源输入（接 7V 电池）</td><td>独立供电，勿接 3V3</td></tr>
+      </tbody>
+    </table>
+    <div class="note warn">
+      ⚠ 重点三项：① <strong>Uno 的引脚 12 输出 5V，不能直连 NodeMCU 的 RX</strong>（ESP8266
+      仅 3.3V 耐压），必须用 1kΩ/2kΩ 分压或电平转换模块；NodeMCU 的 <code class="inline">TX</code>
+      是 3.3V 输出，直连 Uno <code class="inline">引脚 4</code> 即可。② NodeMCU 的
+      <strong>USB 只用于烧录程序</strong>，烧完拔掉，运行时靠 7V 电池供电。③ NodeMCU 的 USB
+      串口与它的 TX/RX 是<strong>同一路 UART0</strong>，串口对话时务必拔掉 USB，否则双方抢串口。
+    </div>
   </section>
 
   <section class="section">
@@ -565,8 +588,243 @@ void loop() {
         <text x="538" y="896">I2C</text>
       </g>
     </svg>
+
+    <h3>Uno ↔ NodeMCU 串口连接图</h3>
+    <svg class="diagram" viewBox="0 0 900 360" role="img"
+         aria-label="Uno 与 NodeMCU 串口连接图">
+      <!-- Arduino UNO -->
+      <rect x="16" y="30" width="180" height="300" rx="10"
+            fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+      <rect x="16" y="30" width="180" height="38" rx="10" fill="#0f172a"/>
+      <text x="106" y="55" text-anchor="middle" fill="#fff"
+            font-size="15" font-weight="600">Arduino UNO</text>
+      <g font-size="13" fill="#334155" text-anchor="end">
+        <text x="190" y="102">5V</text>
+        <text x="190" y="144">GND</text>
+        <text x="190" y="204">4 (RX·收)</text>
+        <text x="190" y="254">12 (TX·发)</text>
+      </g>
+
+      <!-- NodeMCU ESP8266 -->
+      <rect x="650" y="30" width="250" height="300" rx="10"
+            fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+      <rect x="650" y="30" width="250" height="38" rx="10" fill="#0f172a"/>
+      <text x="775" y="55" text-anchor="middle" fill="#fff"
+            font-size="14" font-weight="600">NodeMCU ESP8266</text>
+      <g font-size="13" fill="#334155">
+        <text x="664" y="102">5V</text>
+        <text x="664" y="144">GND</text>
+        <text x="664" y="204">TX(发)</text>
+        <text x="664" y="254">RX(收)</text>
+      </g>
+
+      <!-- 共地 -->
+      <line x1="200" y1="150" x2="646" y2="150" stroke="#334155" stroke-width="2"/>
+      <text x="423" y="142" text-anchor="middle" font-size="12" fill="#475569">共地（必须）</text>
+
+      <!-- TX 直连：Arduino 4 ← NodeMCU TX -->
+      <line x1="196" y1="200" x2="650" y2="200" stroke="#f59e0b" stroke-width="2"/>
+      <text x="423" y="192" text-anchor="middle" font-size="12" fill="#b45309">NodeMCU TX(3.3V) → Uno 4 RX（直连）</text>
+
+      <!-- RX 分压：Uno 12 → 1k/2k → NodeMCU RX -->
+      <line x1="196" y1="250" x2="300" y2="250" stroke="#16a34a" stroke-width="2"/>
+      <text x="262" y="240" text-anchor="middle" font-size="11" fill="#166534">Uno 12 TX</text>
+      <rect x="300" y="242" width="70" height="16" fill="#fff" stroke="#16a34a" stroke-width="2"/>
+      <text x="335" y="254" text-anchor="middle" font-size="11" fill="#16a34a">1kΩ</text>
+      <circle cx="388" cy="250" r="4" fill="#0f172a"/>
+      <line x1="388" y1="250" x2="520" y2="250" stroke="#16a34a" stroke-width="2"/>
+      <rect x="380" y="276" width="16" height="46" fill="#fff" stroke="#334155" stroke-width="2"/>
+      <text x="414" y="300" font-size="11" fill="#334155">2kΩ</text>
+      <line x1="388" y1="258" x2="388" y2="276" stroke="#334155" stroke-width="2"/>
+      <line x1="388" y1="322" x2="388" y2="336" stroke="#334155" stroke-width="2"/>
+      <text x="392" y="348" font-size="11" fill="#475569">GND</text>
+      <line x1="520" y1="250" x2="650" y2="250" stroke="#16a34a" stroke-width="2"/>
+      <text x="575" y="242" text-anchor="middle" font-size="12" fill="#166534">→ NodeMCU RX(3.3V)</text>
+
+      <!-- 电源：7V 电池 → 底座 → 5V -->
+      <rect x="540" y="90" width="28" height="16" rx="3" fill="#fff" stroke="#e11d48" stroke-width="2"/>
+      <rect x="570" y="94" width="10" height="8" fill="#e11d48"/>
+      <line x1="600" y1="98" x2="650" y2="98" stroke="#e11d48" stroke-width="2"/>
+      <text x="522" y="82" text-anchor="middle" font-size="12" fill="#b91c1c">7V 电池</text>
+      <text x="790" y="92" text-anchor="middle" font-size="11" fill="#64748b">底座 6~24V 输入</text>
+    </svg>
+    <div class="note">
+      上图：Arduino <code class="inline">引脚 4 (RX)</code> 接 NodeMCU <code class="inline">TX</code>（3.3V→5V 直连）；
+      Arduino <code class="inline">引脚 12 (TX)</code> 经 <code class="inline">1kΩ/2kΩ</code> 分压接
+      NodeMCU <code class="inline">RX</code>（5V→3.3V）。两块板<strong>共地</strong>；NodeMCU 由底座
+      6~24V 输入（7V 电池）独立供电。
+    </div>
   </section>
 
+    <section class="section">
+    <h2 class="section-title"><span class="num">5</span>NodeMCU 网页服务器程序</h2>
+    <p>
+      这是烧到 <strong>NodeMCU (ESP8266)</strong> 上的独立程序：开 WiFi 热点
+      <code class="inline">SmartFarm</code>、提供网页显示传感器数据并调节照明灯亮度。
+      用 Arduino IDE 选 <code class="inline">NodeMCU 1.0 (ESP-12E Module)</code> 上传
+      （需先在“开发板管理器”安装 <code class="inline">esp8266</code>）。
+    </p>
+    <div class="code-head">
+      <span>SmartFarmWeb.ino</span>
+      <button class="btn" id="copyBtn2">复制代码</button>
+    </div>
+    <pre><code id="code2">/*
+  SmartFarm WiFi 网页服务器 —— NodeMCU (ESP8266)
+  功能：开 WiFi 热点 + 网页；显示传感器数据、调节照明灯亮度。
+  与 Arduino UNO 通过串口(UART0 = GPIO1/3)通信：
+    Arduino -&gt; NodeMCU : SENSOR,光,暗,灯,土,泵,距离
+    NodeMCU -&gt; Arduino : BRIGHT,亮度值(0-255)
+  烧录：Arduino IDE -&gt; 开发板选 "NodeMCU 1.0 (ESP-12E Module)" -&gt; 用 USB 上传
+*/
+#include &lt;ESP8266WiFi.h&gt;
+#include &lt;ESP8266WebServer.h&gt;
+
+// ===== 热点配置 =====
+const char* AP_SSID = "SmartFarm";
+const char* AP_PASS = "12345678";   // 至少 8 位
+
+// ===== 传感器状态（Arduino 每 2 秒发来）=====
+int sLight = 0;      // 光敏 DO 电平
+int sDark = 0;       // 黑暗判定(1=暗)
+int sLamp = 0;       // 照明灯开关(1=开)
+int sSoil = 0;       // 土壤湿度 %
+int sPump = 0;       // 水泵开关(1=开)
+float sDist = -1;    // 距离 cm
+int sBright = 100;   // 灯亮度 0-255
+
+ESP8266WebServer server(80);
+
+// 解析 Arduino 发来的 "SENSOR,光,暗,灯,土,泵,距离"
+void parseLine(String line) {
+  if (!line.startsWith("SENSOR,")) return;
+  String b = line.substring(7);
+  int v[6], idx = 0, start = 0;
+  for (int i = 0; i &lt;= b.length(); i++) {
+    if (i == b.length() || b.charAt(i) == ',') {
+      if (idx &lt; 6) v[idx++] = b.substring(start, i).toInt();
+      start = i + 1;
+    }
+  }
+  if (idx &gt;= 6) {
+    sLight = v[0]; sDark = v[1]; sLamp = v[2];
+    sSoil = v[3]; sPump = v[4]; sDist = v[5];
+  }
+}
+
+// ===== 网页内容 =====
+const char* ROOT_HTML = R"rawliteral(
+&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;meta charset="utf-8"&gt;
+&lt;meta name="viewport" content="width=device-width,initial-scale=1"&gt;
+&lt;title&gt;Smart Farm&lt;/title&gt;
+&lt;style&gt;
+body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:16px}
+h1{font-size:22px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.card{background:#1e293b;border-radius:12px;padding:16px;text-align:center}
+.card .k{font-size:12px;color:#94a3b8}
+.card .v{font-size:22px;font-weight:700;margin-top:6px}
+h3{margin:22px 0 8px}
+.slider{width:100%}
+.sval{text-align:center;font-size:20px;font-weight:700;margin-top:6px}
+&lt;/style&gt;&lt;/head&gt;&lt;body&gt;
+&lt;h1&gt;Smart Farm 🌱&lt;/h1&gt;
+&lt;div class="grid"&gt;
+  &lt;div class="card"&gt;&lt;div class="k"&gt;光照&lt;/div&gt;&lt;div class="v" id="light"&gt;-&lt;/div&gt;&lt;/div&gt;
+  &lt;div class="card"&gt;&lt;div class="k"&gt;土壤湿度&lt;/div&gt;&lt;div class="v" id="soil"&gt;-&lt;/div&gt;&lt;/div&gt;
+  &lt;div class="card"&gt;&lt;div class="k"&gt;水泵&lt;/div&gt;&lt;div class="v" id="pump"&gt;-&lt;/div&gt;&lt;/div&gt;
+  &lt;div class="card"&gt;&lt;div class="k"&gt;距离&lt;/div&gt;&lt;div class="v" id="dist"&gt;-&lt;/div&gt;&lt;/div&gt;
+  &lt;div class="card"&gt;&lt;div class="k"&gt;照明灯&lt;/div&gt;&lt;div class="v" id="lamp"&gt;-&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;h3&gt;照明灯亮度&lt;/h3&gt;
+&lt;input class="slider" type="range" min="0" max="255" value="100" oninput="setBright(this.value)"&gt;
+&lt;div class="sval" id="bv"&gt;100&lt;/div&gt;
+&lt;script&gt;
+async function refresh(){
+  try{
+    const r=await fetch('/data'); const d=await r.json();
+    document.getElementById('light').textContent = d.dark? 'DARK':'BRIGHT';
+    document.getElementById('soil').textContent  = d.soil + ' %';
+    document.getElementById('pump').textContent  = d.pump? 'ON':'OFF';
+    document.getElementById('dist').textContent  = (d.dist&gt;=0? d.dist+' cm':'--');
+    document.getElementById('lamp').textContent  = d.lamp? 'ON':'OFF';
+    document.getElementById('bv').textContent    = d.bright;
+  }catch(e){}
+}
+setInterval(refresh,1000); refresh();
+async function setBright(v){
+  await fetch('/bright?val='+v);
+  document.getElementById('bv').textContent = v;
+}
+&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
+)rawliteral";
+
+void handleRoot() { server.send(200, "text/html", ROOT_HTML); }
+
+// 返回传感器 JSON（网页轮询用）
+void handleData() {
+  String j = "{\"light\":" + String(sLight)
+    + ",\"dark\":" + String(sDark)
+    + ",\"lamp\":" + String(sLamp)
+    + ",\"soil\":" + String(sSoil)
+    + ",\"pump\":" + String(sPump)
+    + ",\"dist\":" + String(sDist, 0)
+    + ",\"bright\":" + String(sBright) + "}";
+  server.send(200, "application/json", j);
+}
+
+// 网页亮度滑块：收到值后发命令给 Arduino
+void handleBright() {
+  if (server.hasArg("val")) {
+    int v = server.arg("val").toInt();
+    if (v &lt; 0) v = 0;
+    if (v &gt; 255) v = 255;
+    sBright = v;
+    Serial.print("BRIGHT,"); Serial.println(v);   // 发给 Arduino
+  }
+  server.send(200, "text/plain", String(sBright));
+}
+
+void setup() {
+  Serial.begin(9600);             // 与 Arduino 通信（UART0=GPIO1/3）
+  WiFi.softAP(AP_SSID, AP_PASS);  // 开热点
+  server.on("/", handleRoot);
+  server.on("/data", handleData);
+  server.on("/bright", handleBright);
+  server.begin();
+}
+
+void loop() {
+  // 读 Arduino 发来的传感器数据
+  while (Serial.available()) {
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+    parseLine(line);
+  }
+  server.handleClient();
+}
+</code></pre>
+    <div class="note">
+      Arduino 与 NodeMCU 串口协议：Arduino 每 2 秒发
+      <code class="inline">SENSOR,光,暗,灯,土,泵,距离</code>；
+      网页亮度滑块由 NodeMCU 发 <code class="inline">BRIGHT,亮度值(0-255)</code> 给 Arduino。
+      烧录后拔掉 NodeMCU 的 USB，运行时靠 7V 电池供电。
+    </div>
+  </section>
+  <script>
+  (function(){
+    var b=document.getElementById('copyBtn2'), c=document.getElementById('code2');
+    b.addEventListener('click', function(){
+      var done=function(){ b.textContent='已复制 ✓'; setTimeout(function(){b.textContent='复制代码';},1800); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(c.innerText).then(done);
+      } else {
+        var t=document.createElement('textarea'); t.value=c.innerText;
+        document.body.appendChild(t); t.select();
+        document.execCommand('copy'); t.remove(); done();
+      }
+    });
+  })();
+  </script>
   <footer>由 arduino-solution 生成 · 仅供学习与快速接线参考</footer>
 </div>
 

@@ -47,6 +47,12 @@
 //   GND ──► GND
 //   I/O ──► D9      // 信号端，用 tone() 改变频率奏乐
 //
+// 【NodeMCU ESP8266（WiFi 网页服务器）串口通信】
+//   NodeMCU TX(GPIO1) ──直连──► Arduino 引脚 4 (RX)          // 收
+//   Arduino 引脚 12 (TX) ──[1kΩ/2kΩ分压]──► NodeMCU RX(GPIO3) // 发
+//   Arduino GND ──── 共地 ──── NodeMCU 扩展板 GND
+//   NodeMCU 由底座 6~24V 输入(7V 电池)供电；烧录用 USB，烧完拔掉
+//
 // 【I2C LCD（0x27）】
 //   VCC ──► 5V
 //   GND ──► GND
@@ -58,6 +64,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_NeoPixel.h>   // 需要安装 Adafruit NeoPixel 库（库管理器搜索 NeoPixel）
+#include <SoftwareSerial.h>      // 与 NodeMCU 通信
 
 // ===== 引脚定义 =====
 #define LIGHT_DO_PIN     3    // 光敏模块 DO（数字量，阈值由蓝色电位器决定）
@@ -89,7 +96,7 @@
 #define DO_ACTIVE_LOW    true  // true：干燥时 DO 输出低电平（常见）
 #define RELAY_ACTIVE_LOW false  // 跳线帽在 H 侧 = 高电平触发，所以用 false
 
-#define UPDATE_DELAY     2000UL  // 土壤/泵/LCD/串口刷新间隔
+#define UPDATE_DELAY     5000UL  // 土壤/泵/LCD/串口刷新间隔（5 秒）
 #define LIGHT_CHECK_MS   250UL   // 光照/灯刷新间隔（越小响应越快）
 #define DEBOUNCE_MS      400UL   // 光照判定需稳定多少毫秒才切换（防抖）
 #define DIST_THRESHOLD_CM    30    // 小于此距离(cm)视为有人靠近
@@ -101,8 +108,17 @@ Adafruit_NeoPixel strip(NUM_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 bool lampOn = false;
 bool pumpOn = false;
-int screen = 0;   // LCD 轮替屏号：0=欢迎 1=土壤 2=泵 3=光照 4=距离
+int screen = 0;   // LCD 轮替屏号：0=欢迎 1=土壤 2=泵 3=光照 4=距离 5=NodeMCU
 float lastDist = -1;   // 最近一次测得的距离(cm)，-1=无回波
+
+// ---- 与 NodeMCU 的软件串口（引脚 4=收, 引脚 12=发）----
+// 协议：Arduino→NodeMCU : SENSOR,光,暗,灯,土,泵,距离
+//       NodeMCU→Arduino : BRIGHT,亮度值(0-255)
+SoftwareSerial es(4, 12);
+int lampBrightness = LAMP_BRIGHTNESS;   // 可由网页调节的灯亮度
+unsigned long lastNodeMsg = 0;   // 最近一次从 NodeMCU 收到数据的时刻
+bool nodeOnline = false;         // NodeMCU 是否在线
+#define NODE_TIMEOUT_MS 4000UL   // 超过此毫秒没收到 NodeMCU 数据则视为离线
 
 void setRelay(bool on) {
   bool active = RELAY_ACTIVE_LOW ? LOW : HIGH;   // 继电器触发电平
@@ -211,7 +227,7 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(TRIG_PIN, LOW);   // 模块要求先拉低 TRIG
   strip.begin();
-  strip.setBrightness(LAMP_BRIGHTNESS);
+  strip.setBrightness(lampBrightness);
   strip.clear();
   strip.show();
 
@@ -243,7 +259,8 @@ void setup() {
   delay(1500);
 
   Serial.begin(9600);
-  Serial.println("Smart Farm ready");
+  Serial.println(F("Smart Farm ready"));
+  es.begin(9600);            // 与 NodeMCU 通信（引脚4收/引脚12发）
 }
 
 void loop() {
@@ -255,18 +272,49 @@ void loop() {
   static unsigned long lastSoilUpdate = 0;
   unsigned long ms = millis();
 
+  // ---- 接收 NodeMCU 数据（非阻塞 + 固定缓冲，省内存）----
+  static char rxBuf[48];
+  static byte rxIdx = 0;
+  while (es.available()) {
+    char c = es.read();
+    if (c == '\n') {
+      rxBuf[rxIdx] = '\0';
+      rxIdx = 0;
+      if (rxBuf[0] != '\0') {
+        Serial.print(F("[NodeMCU] ")); Serial.println(rxBuf);
+        lastNodeMsg = millis();                               // 记录收到时间，用于在线判定
+        if (strncmp(rxBuf, "BRIGHT,", 7) == 0) {
+          int v = atoi(rxBuf + 7);
+          if (v < 0) v = 0;
+          if (v > 255) v = 255;
+          lampBrightness = v;
+          strip.setBrightness(lampBrightness);   // 立即使灯板按新亮度
+        }
+      }
+    } else if (c != '\r' && rxIdx < 47) {
+      rxBuf[rxIdx++] = c;
+    }
+  }
+
   // ---- 超声波测距 & 接近报警：每 ULTRASOUND_CHECK_MS 测一次 ----
   static unsigned long lastUltraCheck = 0;
   static unsigned long lastTrigger = 0;
+  static bool personNear = false;   // 防抖后的"人在旁"状态
+  static byte nearCount = 0;        // 连续"近"的计数（防毛刺误触发）
   if (ms - lastUltraCheck >= ULTRASOUND_CHECK_MS) {
     lastUltraCheck = ms;
     float dist = readDistance();
     lastDist = dist;
-    if (dist > 0 && dist < DIST_THRESHOLD_CM && (ms - lastTrigger > RADAR_COOLDOWN_MS)) {
+    bool nearNow = (dist > 0 && dist < DIST_THRESHOLD_CM);
+    if (nearNow) nearCount++; else nearCount = 0;
+    bool nearStable = (nearCount >= 3);   // 连续 3 次(约0.9秒)都近才算，单次毛刺不算
+    // 边沿触发：只在"从远到近"这一下播放，避免人在旁边时每 3 秒重播导致音乐不断
+    if (nearStable && !personNear && (ms - lastTrigger > RADAR_COOLDOWN_MS)) {
       lastTrigger = ms;
       startSong();
-      Serial.print("有人靠近! 距离="); Serial.print(dist); Serial.println(" cm");
+      Serial.print(F("有人靠近! 距离=")); Serial.print(dist); Serial.println(F(" cm"));
     }
+    personNear = nearStable;
   }
   updateSong();   // 让乐曲逐音符推进（非阻塞，不卡灯/水泵）
 
@@ -295,14 +343,29 @@ void loop() {
     float voltage = soil * 5.0 / 1023.0;
     int moisture = constrain(map(soil, DRY_VALUE, WET_VALUE, 0, 100), 0, 100);
     bool doDry = DO_ACTIVE_LOW ? (doLevel == LOW) : (doLevel == HIGH);
-    const char* doStatus = doDry ? "干燥" : "湿润";
-    const char* status = moisture < DRY_PCT ? "过干"
-                       : moisture > WET_PCT ? "过湿" : "适中";
+    const __FlashStringHelper* doStatus = doDry ? F("干燥") : F("湿润");
+    const __FlashStringHelper* status = moisture < DRY_PCT ? F("过干")
+                                       : moisture > WET_PCT ? F("过湿") : F("适中");
 
     bool dry = (moisture < DRY_PCT);
     pumpOn = dry;
     setRelay(pumpOn);
     digitalWrite(DRY_LED_PIN, dry ? HIGH : LOW);
+
+    // ---- 把传感器数据发给 NodeMCU（网页显示用，9 个字段）----
+    es.print("SENSOR,");
+    es.print(lightLevel); es.print(',');               // 光敏 DO
+    es.print(dark ? 1 : 0); es.print(',');             // 黑暗判定
+    es.print(lampOn ? 1 : 0); es.print(',');           // 照明灯
+    es.print(soil); es.print(',');                     // 土壤 ADC
+    es.print(moisture); es.print(',');                 // 土壤湿度%
+    es.print(doLevel); es.print(',');                  // 土壤 DO
+    es.print(pumpOn ? 1 : 0); es.print(',');           // 水泵
+    es.print(digitalRead(RELAY_PIN)); es.print(',');   // 继电器电平
+    es.println(lastDist >= 0 ? (int)lastDist : -1);    // 距离
+
+    // ---- NodeMCU 在线判定：超过 NODE_TIMEOUT_MS 没收到数据则离线 ----
+    nodeOnline = (ms - lastNodeMsg) < NODE_TIMEOUT_MS;
 
     // ---- LCD 轮替显示（每屏停留 UPDATE_DELAY 秒）----
     switch (screen) {
@@ -338,35 +401,44 @@ void loop() {
         }
         lcd.print("       ");
         break;
+      case 5:   // 屏 6：NodeMCU 在线状态
+        lcd.setCursor(0, 0); lcd.print("NodeMCU         ");
+        lcd.setCursor(0, 1);
+        lcd.print(nodeOnline ? "  ONLINE " : "  OFFLINE");
+        lcd.print("       ");
+        break;
     }
 
-    // ---- 串口：一次性打印全部传感器状态（每 2 秒）----
-    Serial.println("==============================================");
-    Serial.print("[Smart Farm]  LCD屏#"); Serial.println(screen);
+    // ---- 串口：一次性打印全部传感器状态（每 5 秒）----
+    Serial.println(F("=============================================="));
+    Serial.print(F("[Smart Farm]  LCD屏#")); Serial.println(screen);
 
-    Serial.println("-- 光敏传感器 (LDR, DO--D3) ---");
-    Serial.print("   DO电平   : "); Serial.println(lightLevel);
-    Serial.print("   判定     : "); Serial.println(dark ? "黑暗 DARK" : "明亮 BRIGHT");
-    Serial.print("   照明灯   : "); Serial.println(lampOn ? "ON" : "OFF");
+    Serial.println(F("-- 光敏传感器 (LDR, DO--D3) ---"));
+    Serial.print(F("   DO电平   : ")); Serial.println(lightLevel);
+    Serial.print(F("   判定     : ")); Serial.println(dark ? F("黑暗 DARK") : F("明亮 BRIGHT"));
+    Serial.print(F("   照明灯   : ")); Serial.println(lampOn ? F("ON") : F("OFF"));
 
-    Serial.println("-- 土壤湿度传感器 (AO--A0, DO--D2) ---");
-    Serial.print("   ADC原始值 : "); Serial.println(soil);
-    Serial.print("   输出电压  : "); Serial.print(voltage, 2); Serial.println(" V");
-    Serial.print("   土壤湿度  : "); Serial.print(moisture); Serial.println(" %");
-    Serial.print("   DO电平   : "); Serial.println(doLevel);
-    Serial.print("   DO状态   : "); Serial.println(doStatus);
-    Serial.print("   综合状态  : "); Serial.println(status);
+    Serial.println(F("-- 土壤湿度传感器 (AO--A0, DO--D2) ---"));
+    Serial.print(F("   ADC原始值 : ")); Serial.println(soil);
+    Serial.print(F("   输出电压  : ")); Serial.print(voltage, 2); Serial.println(F(" V"));
+    Serial.print(F("   土壤湿度  : ")); Serial.print(moisture); Serial.println(F(" %"));
+    Serial.print(F("   DO电平   : ")); Serial.println(doLevel);
+    Serial.print(F("   DO状态   : ")); Serial.println(doStatus);
+    Serial.print(F("   综合状态  : ")); Serial.println(status);
 
-    Serial.println("-- 超声波测距 (HC-SR04, TRIG--D11, ECHO--D10) ---");
-    if (lastDist >= 0) { Serial.print("   距离      : "); Serial.print(lastDist); Serial.println(" cm"); }
-    else               { Serial.println("   距离      : -- cm (无回波)"); }
+    Serial.println(F("-- 超声波测距 (HC-SR04, TRIG--D11, ECHO--D10) ---"));
+    if (lastDist >= 0) { Serial.print(F("   距离      : ")); Serial.print(lastDist); Serial.println(F(" cm")); }
+    else               { Serial.println(F("   距离      : -- cm (无回波)")); }
 
-    Serial.println("-- 水泵 / 继电器 (D8) ---");
-    Serial.print("   泵状态    : "); Serial.println(pumpOn ? "ON 抽水" : "OFF 停止");
-    Serial.print("   继电器电平: "); Serial.println(digitalRead(RELAY_PIN));
+    Serial.println(F("-- 水泵 / 继电器 (D8) ---"));
+    Serial.print(F("   泵状态    : ")); Serial.println(pumpOn ? F("ON 抽水") : F("OFF 停止"));
+    Serial.print(F("   继电器电平: ")); Serial.println(digitalRead(RELAY_PIN));
 
-    Serial.println("==============================================");
+    Serial.println(F("-- NodeMCU (ESP8266) ---"));
+    Serial.print(F("   在线状态  : ")); Serial.println(nodeOnline ? F("ONLINE") : F("OFFLINE"));
 
-    screen = (screen + 1) % 5;   // 下一屏（下个周期显示）
+    Serial.println(F("=============================================="));
+
+    screen = (screen + 1) % 6;   // 下一屏（下个周期显示）
   }
 }
