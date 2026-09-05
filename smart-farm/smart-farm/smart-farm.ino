@@ -272,11 +272,13 @@ void loop() {
   static unsigned long lastSoilUpdate = 0;
   unsigned long ms = millis();
 
-  // ---- 接收 NodeMCU 数据（非阻塞 + 固定缓冲，省内存）----
+  // ---- 接收 NodeMCU 数据（非阻塞 + 固定缓冲 + 每圈限量，绝不饿死主循环）----
   static char rxBuf[48];
   static byte rxIdx = 0;
-  while (es.available()) {
+  int rxRead = 0;                        // 本圈已读字节数
+  while (es.available() && rxRead < 64) {   // 每圈最多读 64 字节，保证灯/泵/LCD 一定能刷新
     char c = es.read();
+    rxRead++;
     if (c == '\n') {
       rxBuf[rxIdx] = '\0';
       rxIdx = 0;
